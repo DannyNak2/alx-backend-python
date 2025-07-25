@@ -3,7 +3,7 @@ from .models import User, Conversation, Message
 
 
 class UserSerializer(serializers.ModelSerializer):
-    full_name = serializers.SerializerMethodField()
+    full_name = serializers.CharField(source='get_full_name', read_only=True)
 
     class Meta:
         model = User
@@ -24,7 +24,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class MessageSerializer(serializers.ModelSerializer):
-    sender_name = serializers.SerializerMethodField()
+    sender_name = serializers.CharField(source='sender.get_full_name', read_only=True)
 
     class Meta:
         model = Message
@@ -37,9 +37,6 @@ class MessageSerializer(serializers.ModelSerializer):
             'sent_at',
         ]
         read_only_fields = ['message_id', 'sent_at', 'sender']
-
-    def get_sender_name(self, obj):
-        return f"{obj.sender.first_name} {obj.sender.last_name}"
 
 
 class ConversationSerializer(serializers.ModelSerializer):
