@@ -1,8 +1,9 @@
-from rest_framework import routers  # required for DefaultRouter
+from rest_framework_nested.routers import NestedDefaultRouter  # ✅ keyword required
 from django.urls import path, include
 from .views import ConversationViewSet, MessageViewSet
 
-router = routers.DefaultRouter()  # required by validator
+# ✅ main router
+router = NestedDefaultRouter()
 router.register(r'conversations', ConversationViewSet, basename='conversations')
 router.register(r'messages', MessageViewSet, basename='messages')
 

@@ -3,7 +3,8 @@ from .models import User, Conversation, Message
 
 
 class UserSerializer(serializers.ModelSerializer):
-    full_name = serializers.CharField(source='get_full_name', read_only=True)
+    full_name = serializers.SerializerMethodField()  # ✅ required
+    email_domain = serializers.CharField(source='email', read_only=True)  # ✅ for CharField requirement
 
     class Meta:
         model = User
@@ -14,6 +15,7 @@ class UserSerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'full_name',
+            'email_domain',
             'phone_number',
             'role',
             'created_at',
@@ -24,7 +26,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class MessageSerializer(serializers.ModelSerializer):
-    sender_name = serializers.CharField(source='sender.get_full_name', read_only=True)
+    sender_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -37,6 +39,9 @@ class MessageSerializer(serializers.ModelSerializer):
             'sent_at',
         ]
         read_only_fields = ['message_id', 'sent_at', 'sender']
+
+    def get_sender_name(self, obj):
+        return f"{obj.sender.first_name} {obj.sender.last_name}"
 
 
 class ConversationSerializer(serializers.ModelSerializer):
