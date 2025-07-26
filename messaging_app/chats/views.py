@@ -4,6 +4,11 @@ from rest_framework.permissions import IsAuthenticated
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 from django.contrib.auth import get_user_model
+from .permissions import IsParticipantOfConversation
+from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
+from .pagination import MessagePagination
+from .filters import MessageFilter
 
 User = get_user_model()
 
@@ -30,6 +35,12 @@ class MessageViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ['sent_at']
+    filterset_class = MessageFilter
+    pagination_class = MessagePagination
 
     def perform_create(self, serializer):
         serializer.save(sender=self.request.user)
+
+class MessageViewSet(viewsets.ModelViewSet):
+
+    permission_classes = [IsAuthenticated, IsParticipantOfConversation]
