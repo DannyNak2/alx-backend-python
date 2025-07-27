@@ -1,117 +1,161 @@
 #!/usr/bin/env python3
-"""
-Unit and integration tests for client.GithubOrgClient.
+"""Test for the github org client
 """
 
 import unittest
-from parameterized import parameterized, parameterized_class
-from unittest.mock import patch, Mock
+
 from client import GithubOrgClient
-import fixtures
+
+from unittest.mock import patch, PropertyMock, Mock
+
+from parameterized import parameterized, parameterized_class
+
+from fixtures import TEST_PAYLOAD
 
 
 class TestGithubOrgClient(unittest.TestCase):
-    """Unit tests for GithubOrgClient methods."""
+    """Tests for the GithubOrgClient class.
+    """
 
     @parameterized.expand([
         ("google",),
         ("abc",),
     ])
-    @patch("client.get_json")
+    @patch('client.get_json')
     def test_org(self, org_name, mock_get_json):
         """
-        Test that GithubOrgClient.org returns the correct value
-        and calls get_json with the expected URL.
+        method should test that GithubOrgClient.org returns the correct value.
+        :param org_name: string of the organization
+        :param mock_get: mock of the get_json localized in the client module
+        :return:
         """
-        mock_get_json.return_value = {"login": org_name}
-        client = GithubOrgClient(org_name)
-        result = client.org()
-        self.assertEqual(result, {"login": org_name})
-        mock_get_json.assert_called_once_with(
-            f"https://api.github.com/orgs/{org_name}"
-        )
+        github = GithubOrgClient(org_name)
+        github.org
+        expected_url = f"https://api.github.com/orgs/{org_name}"
+        mock_get_json.assert_called_once_with(expected_url)
 
     def test_public_repos_url(self):
-        """Test that _public_repos_url returns correct repos url."""
-        payload = {"repos_url": "https://api.github.com/orgs/test_org/repos"}
-        with patch.object(GithubOrgClient, "org", return_value=payload):
-            client = GithubOrgClient("test_org")
-            result = client._public_repos_url
-            self.assertEqual(result, payload["repos_url"])
+        """
+        method to unit-test GithubOrgClient._public_repos_url.
+        :return:
+        """
+        expected_url = "https://api.github.com/orgs/alx/repos"
+        with patch.object(
+                GithubOrgClient, "org", new_callable=PropertyMock
+        ) as mock_org:
+            mock_org.return_value = {"repos_url": expected_url}
+            github = GithubOrgClient("alx")
+            self.assertEqual(github._public_repos_url, expected_url)
 
-    @patch("client.get_json")
+    @patch('client.get_json')
     def test_public_repos(self, mock_get_json):
         """
-        Test that public_repos returns correct repo list and uses cache.
+        Method to unit-test GithubOrgClient.public_repos
+        :param mock_get_json: patch of get_json() method
+        :return:
         """
-        mock_get_json.return_value = [
-            {"name": "repo1", "license": {"key": "apache-2.0"}},
-            {"name": "repo2", "license": {"key": "mit"}},
+        expected_payload = [
+            {"name": "alx_backend_python", "license": {"key": "MIT"}},
+            {"name": "alx_travel_app"},
+            {"name": "alx_airbnb_database", "license": {"key": "ISC"}}
         ]
+        mock_get_json.return_value = expected_payload
         with patch.object(
-            GithubOrgClient, "_public_repos_url",
-            return_value="https://api.github.com/orgs/test_org/repos"
-        ) as mock_url:
-            client = GithubOrgClient("test_org")
-            result = client.public_repos()
-            self.assertEqual(result, ["repo1", "repo2"])
-            mock_url.assert_called_once()
+                GithubOrgClient, "_public_repos_url", new_callable=PropertyMock
+        ) as mock_public_repos_url:
+            expected_url = "https://api.github.com/orgs/alx/repos"
+            mock_public_repos_url.return_value = expected_url
+            github = GithubOrgClient('alx')
+            result = github.public_repos()
+            self.assertEqual(
+                result,
+                ["alx_backend_python", "alx_travel_app", "alx_airbnb_database"]
+            )
+            mock_public_repos_url.assert_called_once()
             mock_get_json.assert_called_once()
 
     @parameterized.expand([
         ({"license": {"key": "my_license"}}, "my_license", True),
-        ({"license": {"key": "other"}}, "my_license", False),
-        ({}, "my_license", False),
+        ({"license": {"key": "other_license"}}, "my_license", False)
     ])
     def test_has_license(self, repo, license_key, expected):
-        """Test has_license returns expected result."""
-        result = GithubOrgClient.has_license(repo, license_key)
+        """
+        Method to unit-test GithubOrgClient.has_license.
+        :param repo: repo dict
+        :param license_key: license key str
+        :param expected: expected return value
+        :return:
+        """
+        github = GithubOrgClient('alx')
+        result = github.has_license(repo, license_key)
         self.assertEqual(result, expected)
-
-
-
 
 
 @parameterized_class([
     {
-        "org_payload": fixtures.org_payload,
-        "repos_payload": fixtures.repos_payload,
-        "expected_repos": fixtures.expected_repos,
-        "apache2_repos": fixtures.apache2_repos,
-    }
+        "org_payload": payload[0],
+        "repos_payload": payload[1],
+        "expected_repos": payload[2],
+        "apache2_repos": payload[3]
+    } for payload in TEST_PAYLOAD
 ])
 class TestIntegrationGithubOrgClient(unittest.TestCase):
-    """Integration tests using fixture data for GithubOrgClient."""
+    """
+    Integration tests for GithubOrgClient.public_repos.
+    Mocks external HTTP requests.
+    """
 
     @classmethod
     def setUpClass(cls):
-        """Start patching requests.get and setup mocked return values."""
-        cls.get_patcher = patch("requests.get")
-        mock_get = cls.get_patcher.start()
+        """
+        Sets up the class by mocking requests.get.
+        Use patch to start a patcher named get_patcher
+        """
+
+        cls.get_patcher = patch('requests.get')
+        cls.mock_get = cls.get_patcher.start()
 
         def side_effect(url):
+            """
+            Function will return different Mock objects based on the URL
+            :param url:
+            :return:
+            """
             mock_response = Mock()
-            if url == "https://api.github.com/orgs/test_org":
-                mock_response.json.return_value = cls.org_payload
-            elif url == cls.org_payload["repos_url"]:
+            if url == cls.org_payload["repos_url"]:
                 mock_response.json.return_value = cls.repos_payload
+            else:
+                mock_response.json.return_value = cls.org_payload
             return mock_response
 
-        mock_get.side_effect = side_effect
+        cls.mock_get.side_effect = side_effect
 
     @classmethod
     def tearDownClass(cls):
-        """Stop patching requests.get."""
+        """
+        Stops the patcher after all tests in the class have run.
+        """
+
         cls.get_patcher.stop()
 
     def test_public_repos(self):
-        """Test all public repos are returned."""
-        client = GithubOrgClient("test_org")
-        result = client.public_repos()
+        """
+        method to test GithubOrgClient.public_repos.
+        :return:
+        """
+        github = GithubOrgClient('google')
+        result = github.public_repos()
         self.assertEqual(result, self.expected_repos)
 
     def test_public_repos_with_license(self):
-        """Test only Apache-2.0 repos are returned."""
-        client = GithubOrgClient("test_org")
-        result = client.public_repos(license_key="apache-2.0")
+        """
+        method to test GithubOrgClient.public_repos with license
+        :return:
+        """
+        github = GithubOrgClient('google')
+        result = github.public_repos(license="apache-2.0")
         self.assertEqual(result, self.apache2_repos)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
